@@ -393,6 +393,66 @@
             margin-left: 46px;
         }
 
+        /* Arena select: a large preview panel (image + name plate) next to a
+           thumbnail grid, styled after Smash Bros' stage-select screen — sized
+           for 2 stages rather than a dense multi-row grid, since an 80-cell
+           grid with 2 real entries would just look empty. */
+        #stage-select {
+            display: flex;
+            gap: 26px;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        #stage-preview {
+            width: 380px;
+            border: 4px solid #000;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #1e293b;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        #stage-preview-img {
+            width: 100%;
+            height: 270px;
+            background-size: cover;
+            background-position: center;
+        }
+        #stage-preview-name {
+            background: #0f172a;
+            color: white;
+            font-family: 'Russo One', sans-serif;
+            font-size: 1.3rem;
+            padding: 12px 18px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        #stage-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 150px);
+            gap: 14px;
+            align-content: start;
+        }
+        .stage-thumb {
+            width: 150px;
+            height: 112px;
+            border: 3px solid #475569;
+            border-radius: 4px;
+            cursor: pointer;
+            overflow: hidden;
+            box-sizing: border-box;
+            transition: border-color 0.15s, transform 0.15s;
+        }
+        .stage-thumb:hover, .stage-thumb.active {
+            border-color: #ef4444;
+            transform: scale(1.05);
+        }
+        .stage-thumb-img {
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+        }
+
         /* Controls remapping list inside the Options screen. */
         .controls-remap-list {
             display: flex;
@@ -504,9 +564,21 @@
         </div>
         <div id="map-selection" style="display: none; flex-direction: column; align-items: center;">
             <h1>Select Arena</h1>
-            <button class="menu-btn" onclick="selectMap('colosseum')">The Colosseum</button>
-            <button class="menu-btn" onclick="selectMap('tournament')">World Tournament</button>
-            <button class="menu-btn" style="border-color: #ef4444; color: #ef4444; margin-top: 30px;" onclick="backFromMapSelection()">Back</button>
+            <div id="stage-select">
+                <div id="stage-preview">
+                    <div id="stage-preview-img"></div>
+                    <div id="stage-preview-name">The Colosseum</div>
+                </div>
+                <div id="stage-grid">
+                    <div class="stage-thumb" data-map="colosseum" onmouseenter="previewStage('colosseum')" onclick="selectMap('colosseum')">
+                        <div class="stage-thumb-img" style="background-image: url('https://raw.githubusercontent.com/racelijaharcadio/racelijaharcadio.github.io/main/colosseum.jpg');"></div>
+                    </div>
+                    <div class="stage-thumb" data-map="tournament" onmouseenter="previewStage('tournament')" onclick="selectMap('tournament')">
+                        <div class="stage-thumb-img" style="background-image: url('https://raw.githubusercontent.com/racelijaharcadio/racelijaharcadio.github.io/main/tournament.jpg');"></div>
+                    </div>
+                </div>
+            </div>
+            <button class="menu-btn" style="border-color: #ef4444; color: #ef4444; margin-top: 20px;" onclick="backFromMapSelection()">Back</button>
         </div>
         <div id="character-selection" style="display: none; flex-direction: column; align-items: center;">
             <h1>Select Fighters</h1>
@@ -2753,12 +2825,27 @@
             statusEl.style.opacity = visible ? '1' : '0';
         }
 
+        const STAGE_DATA = {
+            colosseum: { name: 'The Colosseum', img: 'https://raw.githubusercontent.com/racelijaharcadio/racelijaharcadio.github.io/main/colosseum.jpg' },
+            tournament: { name: 'World Tournament', img: 'https://raw.githubusercontent.com/racelijaharcadio/racelijaharcadio.github.io/main/tournament.jpg' }
+        };
+
+        function previewStage(mapName) {
+            const data = STAGE_DATA[mapName];
+            document.getElementById('stage-preview-img').style.backgroundImage = `url('${data.img}')`;
+            document.getElementById('stage-preview-name').innerText = data.name;
+            document.querySelectorAll('.stage-thumb').forEach(el => {
+                el.classList.toggle('active', el.dataset.map === mapName);
+            });
+        }
+
         function showMapSelection(vsCPU, isTraining) {
             isVsCPU = vsCPU;
             trainingMode = !!isTraining;
             document.getElementById('versus-mode-selection').style.display = 'none';
             document.getElementById('mode-selection').style.display = 'none';
             document.getElementById('map-selection').style.display = 'flex';
+            previewStage('colosseum');
         }
 
         function showVersusMode() {
