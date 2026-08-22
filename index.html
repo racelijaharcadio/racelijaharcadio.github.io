@@ -393,6 +393,85 @@
             margin-left: 46px;
         }
 
+        /* Character select: a small roster grid (2 fighters, so a scaled-down
+           version of Smash's dense grid rather than a literal copy) plus a
+           player status card per player showing "?" until they pick, then
+           swapping to that fighter's portrait — same before/after pattern as
+           the reference's red P1 hand card / gray "?" P2 card. */
+        #char-grid {
+            display: flex;
+            gap: 22px;
+            margin-bottom: 26px;
+        }
+        .char-card {
+            width: 170px;
+            border: 4px solid #475569;
+            border-radius: 6px;
+            overflow: hidden;
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: border-color 0.15s, transform 0.15s;
+            background: #1e293b;
+        }
+        .char-card:hover {
+            border-color: #38bdf8;
+            transform: scale(1.05);
+        }
+        .char-card-img {
+            width: 100%;
+            height: 170px;
+            background-size: cover;
+            background-position: center;
+        }
+        .char-card-name {
+            background: #0f172a;
+            color: white;
+            font-family: 'Russo One', sans-serif;
+            text-align: center;
+            padding: 10px 0;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        #player-status-row {
+            display: flex;
+            gap: 24px;
+        }
+        .player-status-card {
+            width: 180px;
+            height: 140px;
+            border-radius: 8px;
+            border: 3px solid #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: 'Russo One', sans-serif;
+            overflow: hidden;
+            box-sizing: border-box;
+            background-size: cover;
+            background-position: center;
+        }
+        .p1-status-card { background-color: #b45309; background-image: linear-gradient(160deg, #f59e0b, #b45309); }
+        .p2-status-card { background-color: #581c87; background-image: linear-gradient(160deg, #a21caf, #581c87); }
+        .player-status-icon {
+            font-size: 2.4rem;
+            font-weight: 900;
+            text-shadow: 2px 2px 0 #000;
+        }
+        .player-status-label {
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            opacity: 0.85;
+            margin-top: 4px;
+        }
+        .player-status-name {
+            font-size: 1.2rem;
+            text-shadow: 1px 1px 0 #000;
+            margin-top: 2px;
+        }
+
         /* Arena select: a large preview panel (image + name plate) next to a
            thumbnail grid, styled after Smash Bros' stage-select screen — sized
            for 2 stages rather than a dense multi-row grid, since an 80-cell
@@ -582,12 +661,30 @@
         </div>
         <div id="character-selection" style="display: none; flex-direction: column; align-items: center;">
             <h1>Select Fighters</h1>
-            <h2 id="char-select-status" style="color: white; margin-bottom: 20px; font-size: 2rem;">Player 1, Choose!</h2>
-            <div style="display: flex; gap: 20px; justify-content: center;">
-                <button class="menu-btn char-btn" style="border-color: #38bdf8;" onclick="selectCharacter('valen')">Valen (Aether)</button>
-                <button class="menu-btn char-btn" style="border-color: #d946ef;" onclick="selectCharacter('nyx')">Nyx (Void)</button>
+            <h2 id="char-select-status" style="color: white; margin-bottom: 16px; font-size: 1.6rem;">Player 1, Choose!</h2>
+            <div id="char-grid">
+                <div class="char-card" onclick="selectCharacter('valen')">
+                    <div class="char-card-img" style="background-image: url('https://raw.githubusercontent.com/racelijaharcadio/racelijaharcadio.github.io/main/valen-portrait.jpg');"></div>
+                    <div class="char-card-name">Valen</div>
+                </div>
+                <div class="char-card" onclick="selectCharacter('nyx')">
+                    <div class="char-card-img" style="background-image: url('https://raw.githubusercontent.com/racelijaharcadio/racelijaharcadio.github.io/main/nyx-portrait.jpg');"></div>
+                    <div class="char-card-name">Nyx</div>
+                </div>
             </div>
-            <button class="menu-btn" style="border-color: #ef4444; color: #ef4444; margin-top: 30px;" onclick="backToMapSelection()">Back</button>
+            <div id="player-status-row">
+                <div class="player-status-card p1-status-card" id="p1-status-card">
+                    <div class="player-status-icon" id="p1-status-icon">?</div>
+                    <div class="player-status-label">PLAYER 1</div>
+                    <div class="player-status-name" id="p1-status-name">Choosing...</div>
+                </div>
+                <div class="player-status-card p2-status-card" id="p2-status-card">
+                    <div class="player-status-icon" id="p2-status-icon">?</div>
+                    <div class="player-status-label" id="p2-status-label">PLAYER 2</div>
+                    <div class="player-status-name" id="p2-status-name">Waiting...</div>
+                </div>
+            </div>
+            <button class="menu-btn" style="border-color: #ef4444; color: #ef4444; margin-top: 20px;" onclick="backToMapSelection()">Back</button>
         </div>
         <div id="options-screen" style="display: none; flex-direction: column; align-items: center;">
             <h1>Settings</h1>
@@ -2943,6 +3040,39 @@
             renderControlsUI();
         });
 
+        const CHAR_DATA = {
+            valen: { name: 'Valen', img: 'https://raw.githubusercontent.com/racelijaharcadio/racelijaharcadio.github.io/main/valen-portrait.jpg' },
+            nyx: { name: 'Nyx', img: 'https://raw.githubusercontent.com/racelijaharcadio/racelijaharcadio.github.io/main/nyx-portrait.jpg' }
+        };
+
+        function resetPlayerStatusCards() {
+            const p1Card = document.getElementById('p1-status-card');
+            const p1Icon = document.getElementById('p1-status-icon');
+            p1Card.style.backgroundImage = '';
+            p1Icon.style.display = 'block';
+            p1Icon.innerText = '?';
+            document.getElementById('p1-status-name').innerText = 'Choosing...';
+
+            const p2Card = document.getElementById('p2-status-card');
+            const p2Icon = document.getElementById('p2-status-icon');
+            p2Card.style.backgroundImage = '';
+            p2Icon.style.display = 'block';
+            if (isVsCPU) {
+                p2Icon.innerText = 'CPU';
+                document.getElementById('p2-status-name').innerText = 'Random';
+            } else {
+                p2Icon.innerText = '?';
+                document.getElementById('p2-status-name').innerText = 'Waiting...';
+            }
+        }
+
+        function setPlayerStatusCard(playerNum, charName) {
+            const data = CHAR_DATA[charName];
+            document.getElementById(`p${playerNum}-status-card`).style.backgroundImage = `url('${data.img}')`;
+            document.getElementById(`p${playerNum}-status-icon`).style.display = 'none';
+            document.getElementById(`p${playerNum}-status-name`).innerText = data.name;
+        }
+
         function selectMap(mapName) {
             selectedMap = mapName;
             document.getElementById('map-selection').style.display = 'none';
@@ -2950,13 +3080,16 @@
             selectingFor = 1;
             document.getElementById('char-select-status').innerText = 'Player 1, Choose Fighter!';
             document.getElementById('char-select-status').style.color = '#38bdf8';
+            resetPlayerStatusCards();
         }
 
         function selectCharacter(charName) {
             if (selectingFor === 1) {
                 p1Char = charName;
+                setPlayerStatusCard(1, charName);
                 if (isVsCPU) {
                     p2Char = Math.random() > 0.5 ? 'valen' : 'nyx';
+                    setPlayerStatusCard(2, p2Char);
                     startActualGame();
                 } else {
                     selectingFor = 2;
@@ -2965,6 +3098,7 @@
                 }
             } else {
                 p2Char = charName;
+                setPlayerStatusCard(2, charName);
                 startActualGame();
             }
         }
