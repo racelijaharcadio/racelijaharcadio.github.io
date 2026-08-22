@@ -6,9 +6,23 @@
     <title>Astral Resonance: The Aether Clash</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; overflow: hidden; background-color: #0f172a; font-family: 'Inter', sans-serif; user-select: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
+
+        /* Bold sci-fi display font for all the game's "shouty" UI text — names,
+           timer, ult callouts, menu titles/buttons. Left off small print (key
+           hints, controls body text) since a display face this heavy gets hard
+           to read at tiny sizes — those stay on the default body font. */
+        .name-tag, #timer, #ult-announcement, #winnerText, .combo-counter,
+        .status-text, .controls-box h3, #main-menu h1, #main-menu h2,
+        .menu-btn, #pause-menu h2, .ult-badge {
+            font-family: 'Russo One', sans-serif;
+            letter-spacing: 2px;
+        }
         
         #ui-layer {
             position: absolute;
@@ -288,6 +302,111 @@
             text-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
             text-align: center;
         }
+
+        /* Comic-panel main menu hub, styled after the reference: a dotted tan
+           backdrop holding 3 skewed panels of uneven width (Verses is the hero
+           panel in the middle), each with a bold outlined label in the corner
+           and a hand-built SVG illustration behind it (see the <svg> markup
+           inside each .hub-panel in the HTML — no external image files). */
+        .hub-title {
+            font-family: 'Russo One', sans-serif;
+            font-size: 2.4rem;
+            letter-spacing: 3px;
+            color: #7dd3fc;
+            text-shadow: 2px 2px 0 #000;
+            margin-bottom: 22px;
+        }
+        #menu-hub {
+            position: relative;
+            width: min(1300px, 95vw);
+            height: min(560px, 72vh);
+            background-color: #0b1120;
+            background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1.5px, transparent 1.5px);
+            background-size: 22px 22px;
+            border: 6px solid #000;
+            border-radius: 6px;
+            display: grid;
+            grid-template-columns: 24% 50% 26%;
+            gap: 14px;
+            padding: 16px;
+            box-sizing: border-box;
+        }
+        .hub-panel {
+            position: relative;
+            border: 5px solid #000;
+            cursor: pointer;
+            overflow: hidden;
+            display: flex;
+            align-items: flex-start;
+            padding: 18px 22px;
+            box-sizing: border-box;
+            transition: transform 0.15s, filter 0.15s;
+        }
+        .hub-panel:hover { transform: scale(1.03); z-index: 2; filter: brightness(1.15); }
+        .hub-panel svg {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+        }
+        .hub-label {
+            position: relative;
+            z-index: 1;
+            font-family: 'Russo One', sans-serif;
+            font-size: 2.3rem;
+            letter-spacing: 1px;
+            color: #86efac;
+            text-shadow: 0 0 8px rgba(134, 239, 172, 0.8), 3px 3px 0 #000;
+        }
+        .hub-training {
+            clip-path: polygon(0 0, 100% 0, 78% 100%, 0% 100%);
+            background: #0f172a;
+        }
+        .hub-versus {
+            clip-path: polygon(8% 0, 100% 0, 92% 100%, 0% 100%);
+            background: #0f172a;
+        }
+        .hub-options {
+            clip-path: polygon(18% 0, 100% 0, 100% 100%, 0% 100%);
+            background: #e2e8f0;
+        }
+        .hub-options .hub-label {
+            color: #16a34a;
+            text-shadow: 0 0 6px rgba(22, 163, 74, 0.5), 1px 1px 0 rgba(0,0,0,0.15);
+        }
+
+        /* Controls remapping list inside the Options screen. */
+        .controls-remap-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .remap-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            color: #e2e8f0;
+            font-size: 0.95rem;
+            width: 240px;
+        }
+        .remap-btn {
+            background: rgba(15, 23, 42, 0.8);
+            color: white;
+            border: 2px solid #475569;
+            border-radius: 4px;
+            padding: 4px 12px;
+            min-width: 70px;
+            font-family: monospace;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .remap-btn:hover { border-color: #38bdf8; }
+        .remap-btn.remap-listening {
+            border-color: #facc15;
+            color: #facc15;
+            animation: pulseGlow 0.5s infinite alternate;
+        }
         .menu-btn {
             background: rgba(15, 23, 42, 0.8);
             color: white;
@@ -345,15 +464,153 @@
 
     <div id="main-menu">
         <div id="mode-selection" style="display: flex; flex-direction: column; align-items: center;">
-            <h1>Astral Resonance</h1>
-            <button class="menu-btn" onclick="showMapSelection(true)">1 Player (Vs CPU)</button>
-            <button class="menu-btn" onclick="showMapSelection(false)">2 Player (Local)</button>
+            <h1 style="margin-bottom: 0; font-size: 2.6rem;">Astral Resonance</h1>
+            <div class="hub-title">Main Menu</div>
+            <div id="menu-hub">
+                <div class="hub-panel hub-training" onclick="startTraining()">
+                    <svg viewBox="0 0 240 350" preserveAspectRatio="xMidYMid slice">
+                        <defs>
+                            <linearGradient id="trainBg" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#1e293b"/>
+                                <stop offset="100%" stop-color="#0a0f1c"/>
+                            </linearGradient>
+                            <radialGradient id="trainGlow" cx="35%" cy="45%" r="55%">
+                                <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.35"/>
+                                <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+                            </radialGradient>
+                        </defs>
+                        <rect width="240" height="350" fill="url(#trainBg)"/>
+                        <rect width="240" height="350" fill="url(#trainGlow)"/>
+                        <rect x="0" y="330" width="240" height="20" fill="#000" opacity="0.5"/>
+                        <!-- Valen: wings -->
+                        <polygon points="70,95 30,55 55,100" fill="#7dd3fc" opacity="0.85"/>
+                        <polygon points="72,102 22,80 58,110" fill="#7dd3fc" opacity="0.7"/>
+                        <polygon points="75,112 35,105 62,122" fill="#7dd3fc" opacity="0.55"/>
+                        <!-- Valen: legs, torso, head, arms -->
+                        <rect x="62" y="205" width="14" height="60" fill="#1a1a4d"/>
+                        <rect x="82" y="205" width="14" height="60" fill="#1a1a4d"/>
+                        <rect x="58" y="145" width="42" height="65" rx="3" fill="#21215c" stroke="#000" stroke-width="2"/>
+                        <rect x="64" y="118" width="30" height="27" rx="4" fill="#21215c" stroke="#000" stroke-width="2"/>
+                        <rect x="67" y="128" width="24" height="6" fill="#7dd3fc"/>
+                        <rect x="42" y="150" width="16" height="42" rx="3" fill="#1a1a4d"/>
+                        <rect x="98" y="158" width="58" height="14" rx="4" fill="#21215c" stroke="#000" stroke-width="2"/>
+                        <circle cx="160" cy="165" r="10" fill="#7dd3fc"/>
+                        <!-- Training dummy -->
+                        <ellipse cx="196" cy="312" rx="30" ry="8" fill="#334155"/>
+                        <rect x="191" y="252" width="8" height="60" fill="#475569"/>
+                        <rect x="172" y="196" width="46" height="58" rx="4" fill="#64748b" stroke="#000" stroke-width="2"/>
+                        <circle cx="195" cy="174" r="19" fill="#94a3b8" stroke="#000" stroke-width="2"/>
+                        <rect x="186" y="169" width="6" height="6" fill="#1e293b"/>
+                        <rect x="199" y="169" width="6" height="6" fill="#1e293b"/>
+                        <!-- Impact spark -->
+                        <polygon points="168,165 178,158 176,168 186,165 176,172 178,182 168,175 158,182 160,172 150,165 160,158" fill="#fde68a" opacity="0.9"/>
+                    </svg>
+                    <span class="hub-label" style="color:#facc15;">TRAINING</span>
+                </div>
+                <div class="hub-panel hub-versus" onclick="showVersusMode()">
+                    <svg viewBox="0 0 500 300" preserveAspectRatio="xMidYMid slice">
+                        <defs>
+                            <linearGradient id="versusBg" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stop-color="#0c1f33"/>
+                                <stop offset="48%" stop-color="#0f172a"/>
+                                <stop offset="52%" stop-color="#1a0f2e"/>
+                                <stop offset="100%" stop-color="#22102e"/>
+                            </linearGradient>
+                            <radialGradient id="clashFlash" cx="50%" cy="55%" r="30%">
+                                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+                                <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+                            </radialGradient>
+                        </defs>
+                        <rect width="500" height="300" fill="url(#versusBg)"/>
+                        <rect y="0" width="500" height="40" fill="#fff" opacity="0.03"/>
+                        <rect y="90" width="500" height="18" fill="#fff" opacity="0.03"/>
+                        <rect y="160" width="500" height="12" fill="#fff" opacity="0.03"/>
+                        <rect x="0" y="270" width="500" height="30" fill="#000" opacity="0.5"/>
+                        <!-- Valen (left) -->
+                        <polygon points="130,90 70,40 105,100" fill="#7dd3fc" opacity="0.85"/>
+                        <polygon points="135,100 60,70 108,112" fill="#7dd3fc" opacity="0.65"/>
+                        <rect x="118" y="170" width="18" height="72" fill="#1a1a4d"/>
+                        <rect x="144" y="170" width="18" height="72" fill="#1a1a4d"/>
+                        <rect x="112" y="105" width="58" height="80" rx="4" fill="#21215c" stroke="#000" stroke-width="2"/>
+                        <rect x="120" y="72" width="38" height="34" rx="5" fill="#21215c" stroke="#000" stroke-width="2"/>
+                        <rect x="125" y="85" width="30" height="7" fill="#38bdf8"/>
+                        <rect x="76" y="112" width="20" height="50" rx="3" fill="#1a1a4d"/>
+                        <rect x="168" y="120" width="70" height="18" rx="5" fill="#21215c" stroke="#000" stroke-width="2"/>
+                        <circle cx="240" cy="129" r="13" fill="#7dd3fc"/>
+                        <!-- Nyx (right, mirrored) -->
+                        <polygon points="370,90 430,40 395,100" fill="#a78bfa" opacity="0.85"/>
+                        <polygon points="365,100 440,70 392,112" fill="#a78bfa" opacity="0.65"/>
+                        <rect x="364" y="170" width="18" height="72" fill="#3b0764"/>
+                        <rect x="338" y="170" width="18" height="72" fill="#3b0764"/>
+                        <rect x="330" y="105" width="58" height="80" rx="4" fill="#581c87" stroke="#000" stroke-width="2"/>
+                        <rect x="342" y="72" width="38" height="34" rx="5" fill="#581c87" stroke="#000" stroke-width="2"/>
+                        <rect x="347" y="85" width="30" height="7" fill="#d946ef"/>
+                        <polygon points="345,120 360,112 372,122 358,132" fill="#7c3aed"/>
+                        <circle cx="359" cy="150" r="9" fill="#000"/>
+                        <circle cx="359" cy="150" r="12" fill="none" stroke="#d946ef" stroke-width="2.5"/>
+                        <rect x="424" y="112" width="20" height="50" rx="3" fill="#3b0764"/>
+                        <rect x="262" y="120" width="70" height="18" rx="5" fill="#581c87" stroke="#000" stroke-width="2"/>
+                        <circle cx="260" cy="129" r="13" fill="#d946ef"/>
+                        <!-- Fist-clash flash -->
+                        <circle cx="250" cy="129" r="55" fill="url(#clashFlash)"/>
+                        <polygon points="250,100 258,120 280,129 258,138 250,158 242,138 220,129 242,120" fill="#fff" opacity="0.9"/>
+                    </svg>
+                    <span class="hub-label" style="color:#7dd3fc;">VERSUS</span>
+                </div>
+                <div class="hub-panel hub-options" onclick="showOptions()">
+                    <svg viewBox="0 0 260 350" preserveAspectRatio="xMidYMid slice">
+                        <defs>
+                            <linearGradient id="settingsBg" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#f1f5f9"/>
+                                <stop offset="100%" stop-color="#cbd5e1"/>
+                            </linearGradient>
+                        </defs>
+                        <rect width="260" height="350" fill="url(#settingsBg)"/>
+                        <circle cx="60" cy="60" r="2" fill="#94a3b8"/>
+                        <circle cx="150" cy="40" r="1.6" fill="#94a3b8"/>
+                        <circle cx="210" cy="90" r="2.2" fill="#94a3b8"/>
+                        <circle cx="100" cy="130" r="1.6" fill="#94a3b8"/>
+                        <circle cx="190" cy="180" r="2" fill="#94a3b8"/>
+                        <circle cx="40" cy="200" r="1.6" fill="#94a3b8"/>
+                        <!-- Gear icon -->
+                        <g transform="translate(75,240)" fill="#16a34a" opacity="0.65">
+                            <circle r="26"/>
+                            <rect x="-4" y="-36" width="8" height="14"/>
+                            <rect x="-4" y="22" width="8" height="14"/>
+                            <rect x="-36" y="-4" width="14" height="8"/>
+                            <rect x="22" y="-4" width="14" height="8"/>
+                            <rect x="-28" y="-24" width="10" height="8" transform="rotate(45)"/>
+                            <rect x="18" y="-24" width="10" height="8" transform="rotate(-45)"/>
+                            <rect x="-28" y="16" width="10" height="8" transform="rotate(-45)"/>
+                            <rect x="18" y="16" width="10" height="8" transform="rotate(45)"/>
+                            <circle r="12" fill="#f1f5f9"/>
+                        </g>
+                        <!-- Controller icon -->
+                        <g transform="translate(185,255)" fill="#16a34a" opacity="0.65">
+                            <rect x="-40" y="-14" width="80" height="30" rx="15"/>
+                            <rect x="-58" y="-6" width="22" height="16" rx="6"/>
+                            <rect x="36" y="-6" width="22" height="16" rx="6"/>
+                            <rect x="-25" y="-4" width="12" height="4" fill="#f1f5f9"/>
+                            <rect x="-21" y="-8" width="4" height="12" fill="#f1f5f9"/>
+                            <circle cx="20" cy="-3" r="3.5" fill="#f1f5f9"/>
+                            <circle cx="12" cy="4" r="3.5" fill="#f1f5f9"/>
+                        </g>
+                    </svg>
+                    <span class="hub-label" style="color:#16a34a;">SETTINGS</span>
+                </div>
+            </div>
+        </div>
+        <div id="versus-mode-selection" style="display: none; flex-direction: column; align-items: center;">
+            <h1>Versus</h1>
+            <button class="menu-btn" onclick="showMapSelection(true)">Vs CPU</button>
+            <button class="menu-btn" onclick="showMapSelection(false)">Vs Player</button>
+            <button class="menu-btn" style="border-color: #ef4444; color: #ef4444; margin-top: 30px;" onclick="backToModeSelection()">Back</button>
         </div>
         <div id="map-selection" style="display: none; flex-direction: column; align-items: center;">
             <h1>Select Arena</h1>
             <button class="menu-btn" onclick="selectMap('colosseum')">The Colosseum</button>
             <button class="menu-btn" onclick="selectMap('tournament')">World Tournament</button>
-            <button class="menu-btn" style="border-color: #ef4444; color: #ef4444; margin-top: 30px;" onclick="backToModeSelection()">Back</button>
+            <button class="menu-btn" style="border-color: #ef4444; color: #ef4444; margin-top: 30px;" onclick="backFromMapSelection()">Back</button>
         </div>
         <div id="character-selection" style="display: none; flex-direction: column; align-items: center;">
             <h1>Select Fighters</h1>
@@ -363,6 +620,24 @@
                 <button class="menu-btn char-btn" style="border-color: #d946ef;" onclick="selectCharacter('nyx')">Nyx (Void)</button>
             </div>
             <button class="menu-btn" style="border-color: #ef4444; color: #ef4444; margin-top: 30px;" onclick="backToMapSelection()">Back</button>
+        </div>
+        <div id="options-screen" style="display: none; flex-direction: column; align-items: center;">
+            <h1>Settings</h1>
+            <label style="color: #e2e8f0; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; margin: 10px 0 25px;">
+                <input type="checkbox" id="mute-checkbox" onchange="toggleMute(this.checked)" style="width: 20px; height: 20px;">
+                Mute Sound Effects
+            </label>
+            <div style="display: flex; gap: 40px; max-height: 50vh; overflow-y: auto; padding: 0 10px;">
+                <div>
+                    <h3 style="color: #38bdf8; text-transform: uppercase; margin-bottom: 8px;">Player 1</h3>
+                    <div id="p1-controls-list" class="controls-remap-list"></div>
+                </div>
+                <div>
+                    <h3 style="color: #d946ef; text-transform: uppercase; margin-bottom: 8px;">Player 2</h3>
+                    <div id="p2-controls-list" class="controls-remap-list"></div>
+                </div>
+            </div>
+            <button class="menu-btn" style="border-color: #ef4444; color: #ef4444; margin-top: 20px;" onclick="backToModeSelection()">Back</button>
         </div>
     </div>
 
@@ -487,8 +762,10 @@
             noise.stop(now + duration);
         }
 
+        let audioMuted = false;
+
         function playSound(type) {
-            if (!audioCtx) return;
+            if (!audioCtx || audioMuted) return;
             const now = audioCtx.currentTime;
 
             if (type === 'light_punch') {
@@ -1194,6 +1471,7 @@
                 this.controls = controls;
 
                 this.isBot = false;
+                this.isTrainingDummy = false;
                 this.virtualKeys = {};
                 this.botTimer = 0;
                 this.botState = 'idle';
@@ -1251,8 +1529,13 @@
                 // getting its own independent (and visually mismatched) pattern.
                 const armorTexture = this.charType === 'nyx' ? createCrackedArmorTexture() : null;
 
-                const baseMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.4, metalness: 0.6, map: armorTexture });
-                const darkMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.6, metalness: 0.2, map: armorTexture });
+                // Valen's UI color (bright cyan) stays on the health bar, resonance bar,
+                // hit sparks, etc. via the `color` param — but the armor shell itself uses
+                // a fixed dark indigo so the model reads as a dark mech with glowing cyan
+                // accents (per the reference art) instead of solid bright blue all over.
+                const bodyColor = this.charType === 'valen' ? 0x21215c : color;
+                const baseMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.4, metalness: 0.6, map: armorTexture });
+                const darkMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.6, metalness: 0.2, map: armorTexture });
                 darkMat.color.multiplyScalar(0.6);
                 
                 const bodyGeo = new THREE.BoxGeometry(1.0, 1.6, 0.8);
@@ -1272,20 +1555,6 @@
                 const visor = new THREE.Mesh(visorGeo, visorMat);
                 visor.position.set(0, 3.1, 0.35);
                 group.add(visor);
-
-                if (this.charType === 'valen') {
-                    const wingGroup = new THREE.Group();
-                    wingGroup.position.set(0, 2.2, -0.45);
-                    for (let side of [-1, 1]) {
-                        const wingGeo = new THREE.ConeGeometry(0.3, 2.5, 3);
-                        const wingMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.6 });
-                        const wing = new THREE.Mesh(wingGeo, wingMat);
-                        wing.position.set(side * 0.8, 0.5, 0);
-                        wing.rotation.z = side * -0.8;
-                        wingGroup.add(wing);
-                    }
-                    group.add(wingGroup);
-                }
 
                 const createLimb = (isArm, xOffset, yOffset, name) => {
                     const pivot = new THREE.Group(); 
@@ -1425,6 +1694,99 @@
                     group.add(debrisGroup);
                 }
 
+                if (this.charType === 'valen') {
+                    // Valen redesign based on the reference art: a dark indigo mech shell
+                    // (set above via bodyColor) with glowing cyan rune-line seams, faceted
+                    // crystal shoulder/knee armor, and a multi-shard wing fan on the back.
+                    // Several tapered ConeGeometry shards per wing (rather than one wing
+                    // mesh) is what reads as jagged ice crystal instead of a smooth
+                    // bird/bat wing, matching the reference's shattered-glass silhouette.
+                    const runeMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x22d3ee, emissiveIntensity: 1.1, roughness: 0.3, metalness: 0.4 });
+                    const crystalMat = new THREE.MeshStandardMaterial({ color: 0x7dd3fc, emissive: 0x0ea5e9, emissiveIntensity: 0.7, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.9 });
+                    const gauntletMat = new THREE.MeshStandardMaterial({ color: 0x21215c, roughness: 0.3, metalness: 0.75 });
+
+                    // Crystal wing fan: 5 shards per side, fanning upward/outward and
+                    // growing longer toward the top, echoing the reference's angel-like
+                    // ice wings.
+                    const wingGroup = new THREE.Group();
+                    wingGroup.position.set(0, 2.5, -0.5);
+                    for (let side of [-1, 1]) {
+                        const featherCount = 5;
+                        for (let i = 0; i < featherCount; i++) {
+                            const t = i / (featherCount - 1); // 0 (bottom) .. 1 (top) across the fan
+                            const length = 1.4 + t * 1.3;
+                            const shardGeo = new THREE.ConeGeometry(0.14 - t * 0.04, length, 4);
+                            const shard = new THREE.Mesh(shardGeo, crystalMat);
+                            shard.position.set(side * (0.25 + t * 0.55), 0.3 + t * 0.55, -t * 0.15);
+                            shard.rotation.z = side * (0.5 + t * 0.95);
+                            shard.rotation.x = -0.1;
+                            shard.castShadow = true;
+                            wingGroup.add(shard);
+                        }
+                    }
+                    group.add(wingGroup);
+
+                    // Faceted crystal shoulder pauldrons, mounted on the arm pivots so
+                    // they track naturally with arm movement during poses and attacks.
+                    [leftArm, rightArm].forEach((arm, i) => {
+                        const side = i === 0 ? -1 : 1;
+                        const pauldron = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), crystalMat);
+                        pauldron.position.set(side * 0.12, 0.15, 0);
+                        pauldron.scale.set(0.9, 1.3, 0.9);
+                        pauldron.castShadow = true;
+                        arm.add(pauldron);
+                    });
+
+                    // Chunky gauntlet caps on the forearms, echoing the reference's
+                    // oversized blocky fists. Attached to the elbow joint so they move
+                    // with the forearm specifically, not the whole arm pivot.
+                    [leftArm, rightArm].forEach(arm => {
+                        const gauntlet = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.34, 0.42), gauntletMat);
+                        gauntlet.position.set(0, -0.75, 0);
+                        gauntlet.castShadow = true;
+                        arm.getObjectByName(arm.name + "Joint").add(gauntlet);
+                    });
+
+                    // Faceted crystal knee/shin guards, matching the wing/pauldron
+                    // material family, attached to each leg's knee joint.
+                    [leftLeg, rightLeg].forEach(leg => {
+                        const shin = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), crystalMat);
+                        shin.position.set(0, -0.35, 0.14);
+                        shin.scale.set(0.8, 1.1, 0.7);
+                        shin.castShadow = true;
+                        leg.getObjectByName(leg.name + "Joint").add(shin);
+                    });
+
+                    // Chest core: the point the Astral Beam ultimate fires from, plus a
+                    // thin glowing ring, echoing the reference's chest emitter.
+                    const coreGlow = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), new THREE.MeshBasicMaterial({ color: 0x7dd3fc }));
+                    coreGlow.position.set(0, 2.2, 0.42);
+                    group.add(coreGlow);
+
+                    const coreRing = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.035, 8, 24), runeMat);
+                    coreRing.position.set(0, 2.2, 0.43);
+                    group.add(coreRing);
+
+                    // Glowing rune-line seams across the chest and down each limb — thin
+                    // emissive strips rather than a texture, since this engine has no
+                    // shader budget for a scrolling/etched-glyph material.
+                    const chestRune = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.06, 0.05), runeMat);
+                    chestRune.position.set(0, 1.65, 0.42);
+                    group.add(chestRune);
+
+                    [leftLeg, rightLeg].forEach(leg => {
+                        const thighRune = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.05), runeMat);
+                        thighRune.position.set(0, -0.4, 0.18);
+                        leg.add(thighRune);
+                    });
+
+                    [leftArm, rightArm].forEach(arm => {
+                        const armRune = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.05), runeMat);
+                        armRune.position.set(0, -0.4, 0.19);
+                        arm.add(armRune);
+                    });
+                }
+
                 group.add(leftArm);
                 group.add(rightArm);
                 group.add(leftLeg);
@@ -1479,6 +1841,11 @@
 
             triggerUltimate(opponent) {
                 this.state = 'ultimate';
+                // Same glide fix as light/heavy attacks: 'ultimate' is also excluded from
+                // the movement friction decay, so leftover WASD velocity would otherwise
+                // slide you across the map for the entire cinematic.
+                this.velocity.x = 0;
+                this.velocity.z = 0;
                 this.hasUsedUltimate = true;
                 this.ultFrame = 0;
                 this.ultPhase = 0;
@@ -1865,7 +2232,7 @@
                     if (this.nyxDebris) this.nyxDebris.rotation.y += 0.015;
                 }
 
-                if (this.isBot && this.stunTimer <= 0) {
+                if (this.isBot && !this.isTrainingDummy && this.stunTimer <= 0) {
                     this.updateBot(opponent);
                 }
 
@@ -1888,10 +2255,12 @@
                 this.prevActionKeys[this.controls.heavy] = !!currentKeys[this.controls.heavy];
                 this.prevActionKeys[this.controls.dash] = !!currentKeys[this.controls.dash];
 
-                if (this.stunTimer <= 0 && (this.actionTimer <= 0 || this.canChain)) {
+                if (this.stunTimer <= 0 && this.state !== 'ultimate' && (this.actionTimer <= 0 || this.canChain)) {
                     this.handleInputs(currentKeys, opponent, justPressed);
                 } else if (this.stunTimer <= 0 && this.state === 'idle') {
                     this.handleInputs(currentKeys, opponent, justPressed);
+                } else if (this.stunTimer <= 0 && this.state === 'attacking') {
+                    this.updateAttackMovement(currentKeys);
                 }
 
                 if (this.state === 'idle' || this.state === 'blocking' || this.state === 'charging') {
@@ -1900,6 +2269,14 @@
                 } else if (this.state === 'moving') {
                      this.velocity.x *= 0.85;
                      this.velocity.z *= 0.85;
+                } else if (this.state === 'ultimate') {
+                     // Belt-and-suspenders: handleInputs is now blocked above during
+                     // 'ultimate' (that was the actual glide source — held WASD kept
+                     // setting velocity every frame, hijacking the cinematic), but this
+                     // hard-zeroes it every step too, so nothing else that ever touches
+                     // velocity can reintroduce drift during the ultimate.
+                     this.velocity.x = 0;
+                     this.velocity.z = 0;
                 }
 
                 const lArm = this.mesh.getObjectByName("leftArm");
@@ -2071,6 +2448,35 @@
                     if (this.isGrounded) this.state = 'moving';
                 } else if (this.isGrounded) {
                     this.state = 'idle';
+                }
+            }
+
+            // Lets you reposition with WASD during an attack's startup/active/recovery
+            // frames — e.g. backing up mid-heavy-swing — without touching this.state
+            // (stays 'attacking' so the attack's own frame timer, hitbox, and pose keep
+            // running exactly as scheduled) and without triggering a new light/heavy/
+            // dash/block/charge action. Velocity is set directly from currently-held
+            // keys every step rather than accumulated, so it can't carry momentum from
+            // before the attack started and stops dead the instant keys are released —
+            // this is the actual fix for "gliding": handleInputs is what was setting
+            // velocity from movement, and it's locked out for most of an attack, so any
+            // velocity already in flight from before the attack never got touched or
+            // decayed. This runs unconditionally as long as you're in the attacking
+            // state, filling that gap.
+            updateAttackMovement(keys) {
+                let moveDir = new THREE.Vector3();
+                if (keys[this.controls.left]) moveDir.x -= 1;
+                if (keys[this.controls.right]) moveDir.x += 1;
+                if (keys[this.controls.up]) moveDir.z -= 1;
+                if (keys[this.controls.down]) moveDir.z += 1;
+
+                if (moveDir.length() > 0) {
+                    moveDir.normalize();
+                    this.velocity.x = moveDir.x * 0.22;
+                    this.velocity.z = moveDir.z * 0.22;
+                } else {
+                    this.velocity.x = 0;
+                    this.velocity.z = 0;
                 }
             }
 
@@ -2322,7 +2728,11 @@
         let timerInterval = null;
         let isVsCPU = true;
         let selectedMap = '';
+        let trainingMode = false;
         let selectingFor = 1;
+        let p1ControlsConfig = { up: 'w', down: 's', left: 'a', right: 'd', light: 'e', heavy: 'r', charge: 'h', block: 'f', dash: 'v', ult: 't' };
+        let p2ControlsConfig = { up: 'arrowup', down: 'arrowdown', left: 'arrowleft', right: 'arrowright', light: 'o', heavy: 'p', charge: ';', block: 'l', dash: '.', ult: 'u' };
+        let rebindTarget = null;
         let p1Char = '';
         let p2Char = '';
 
@@ -2400,6 +2810,23 @@
             bar.style.width = `${pct}%`;
         }
 
+        // Rebuilds the in-match control-hint box (bottom-left/right HUD) from
+        // whatever is currently bound, so a remapped key shows correctly during
+        // a match instead of the old hardcoded WASD/Arrows hints.
+        function renderControlsHUD(id, controls) {
+            const box = document.getElementById(`controls-${id}`);
+            const nameHeader = box.querySelector('h3').outerHTML;
+            const k = formatKeyLabel;
+            box.innerHTML = nameHeader +
+                `<div><span class="key">${k(controls.up)}</span><span class="key">${k(controls.left)}</span><span class="key">${k(controls.down)}</span><span class="key">${k(controls.right)}</span> Move</div>` +
+                `<div><span class="key">${k(controls.light)}</span> Light Strike</div>` +
+                `<div><span class="key">${k(controls.heavy)}</span> Heavy/Launch</div>` +
+                `<div><span class="key">${k(controls.charge)}</span> Charge Resonance</div>` +
+                `<div><span class="key">${k(controls.block)}</span> Block</div>` +
+                `<div><span class="key">${k(controls.dash)}</span> Dash</div>` +
+                `<div><span class="key ult-key-highlight">${k(controls.ult)}</span> Ultimate (Full Resonance)</div>`;
+        }
+
         function updateBlockUI(id, current, max) {
             const bar = document.getElementById(`p${id}-block`);
             const pct = Math.max(0, (current / max) * 100);
@@ -2430,11 +2857,108 @@
             statusEl.style.opacity = visible ? '1' : '0';
         }
 
-        function showMapSelection(vsCPU) {
+        function showMapSelection(vsCPU, isTraining) {
             isVsCPU = vsCPU;
+            trainingMode = !!isTraining;
+            document.getElementById('versus-mode-selection').style.display = 'none';
             document.getElementById('mode-selection').style.display = 'none';
             document.getElementById('map-selection').style.display = 'flex';
         }
+
+        function showVersusMode() {
+            document.getElementById('mode-selection').style.display = 'none';
+            document.getElementById('versus-mode-selection').style.display = 'flex';
+        }
+
+        function startTraining() {
+            // Training is single-player practice against a passive dummy, so it
+            // reuses the existing 1P (vs CPU) arena/character-select flow rather
+            // than duplicating it — the only difference is the trainingMode flag,
+            // which startGame() checks to turn the CPU fighter into a non-attacking
+            // dummy with health that resets instead of ending the match.
+            showMapSelection(true, true);
+        }
+
+        function backFromMapSelection() {
+            // Training jumps straight from the hub into map-selection (no Versus
+            // sub-menu in between), so its Back button needs to return to the hub
+            // directly instead of to a Versus screen it never went through.
+            document.getElementById('map-selection').style.display = 'none';
+            if (trainingMode) {
+                document.getElementById('mode-selection').style.display = 'flex';
+            } else {
+                document.getElementById('versus-mode-selection').style.display = 'flex';
+            }
+        }
+
+        function showOptions() {
+            document.getElementById('mode-selection').style.display = 'none';
+            document.getElementById('options-screen').style.display = 'flex';
+            document.getElementById('mute-checkbox').checked = audioMuted;
+            renderControlsUI();
+        }
+
+        function toggleMute(checked) {
+            audioMuted = checked;
+        }
+
+        // --- Controls remapping ---
+        const CONTROL_ACTIONS = [
+            ['up', 'Move Up'], ['down', 'Move Down'], ['left', 'Move Left'], ['right', 'Move Right'],
+            ['light', 'Light Strike'], ['heavy', 'Heavy/Launch'], ['charge', 'Charge Resonance'],
+            ['block', 'Block'], ['dash', 'Dash'], ['ult', 'Ultimate']
+        ];
+        const ARROW_KEY_SYMBOLS = { arrowup: '\u2191', arrowdown: '\u2193', arrowleft: '\u2190', arrowright: '\u2192' };
+
+        function formatKeyLabel(key) {
+            return ARROW_KEY_SYMBOLS[key] || key.toUpperCase();
+        }
+
+        function renderControlsUI() {
+            renderControlsListFor(1, p1ControlsConfig, document.getElementById('p1-controls-list'));
+            renderControlsListFor(2, p2ControlsConfig, document.getElementById('p2-controls-list'));
+        }
+
+        function renderControlsListFor(player, controls, container) {
+            container.innerHTML = '';
+            CONTROL_ACTIONS.forEach(([action, label]) => {
+                const row = document.createElement('div');
+                row.className = 'remap-row';
+                const btn = document.createElement('button');
+                btn.className = 'remap-btn';
+                btn.innerText = formatKeyLabel(controls[action]);
+                btn.onclick = () => startRebind(player, action, btn);
+                const labelSpan = document.createElement('span');
+                labelSpan.innerText = label;
+                row.appendChild(labelSpan);
+                row.appendChild(btn);
+                container.appendChild(row);
+            });
+        }
+
+        function startRebind(player, action, btnEl) {
+            // Cancel any rebind already in progress (its button never got a
+            // keypress) so only one control can be "listening" at a time.
+            if (rebindTarget) renderControlsUI();
+            rebindTarget = { player, action };
+            btnEl.innerText = '...';
+            btnEl.classList.add('remap-listening');
+        }
+
+        // Separate listener from the main gameplay one below — this only ever
+        // acts while rebindTarget is set (i.e. the Options screen has a button
+        // actively waiting for a key), so it can't interfere with normal play.
+        window.addEventListener('keydown', (e) => {
+            if (!rebindTarget) return;
+            e.preventDefault();
+            const key = e.key.toLowerCase();
+            if (key !== 'escape') {
+                const controls = rebindTarget.player === 1 ? p1ControlsConfig : p2ControlsConfig;
+                controls[rebindTarget.action] = key;
+            }
+            rebindTarget = null;
+            renderControlsUI();
+        });
 
         function selectMap(mapName) {
             selectedMap = mapName;
@@ -2469,7 +2993,9 @@
 
         function backToModeSelection() {
             document.getElementById('mode-selection').style.display = 'flex';
+            document.getElementById('versus-mode-selection').style.display = 'none';
             document.getElementById('map-selection').style.display = 'none';
+            document.getElementById('options-screen').style.display = 'none';
         }
 
         function startActualGame() {
@@ -2491,6 +3017,8 @@
             document.getElementById('p2-name-text').innerText = p2NameStr;
             document.getElementById('controls-p1').querySelector('h3').innerText = `Player 1 (${p1NameStr})`;
             document.getElementById('controls-p2').querySelector('h3').innerText = `Player 2 (${p2NameStr})`;
+            renderControlsHUD('p1', p1ControlsConfig);
+            renderControlsHUD('p2', p2ControlsConfig);
 
             // Nyx's base body color moved from bright pink to deep violet-purple, matching
             // the reference art where the body itself is dark purple and pink is reserved
@@ -2503,17 +3031,17 @@
                 p2Color = p2Char === 'valen' ? 0x0284c7 : 0x86198f; 
             }
 
-            const p1Controls = { up: 'w', down: 's', left: 'a', right: 'd', light: 'e', heavy: 'r', charge: 'h', block: 'f', dash: 'v', ult: 't' };
-            const p2Controls = { up: 'arrowup', down: 'arrowdown', left: 'arrowleft', right: 'arrowright', light: 'o', heavy: 'p', charge: ';', block: 'l', dash: '.', ult: 'u' };
-
-            player1 = new Fighter(1, p1Char, p1Color, p1NameStr, -5, p1Controls, {});
-            player2 = new Fighter(2, p2Char, p2Color, p2NameStr, 5, p2Controls, {});
+            player1 = new Fighter(1, p1Char, p1Color, p1NameStr, -5, p1ControlsConfig, {});
+            player2 = new Fighter(2, p2Char, p2Color, p2NameStr, 5, p2ControlsConfig, {});
 
             if (isVsCPU) {
                 player2.isBot = true;
             }
+            if (trainingMode) {
+                player2.isTrainingDummy = true;
+            }
 
-            matchTimer = 99;
+            matchTimer = trainingMode ? 999 : 99;
             document.getElementById('timer').innerText = matchTimer;
 
             if (timerInterval) clearInterval(timerInterval);
@@ -2671,7 +3199,14 @@
             }
 
             if (player1.health <= 0) endGame(`${player2.name.toUpperCase()} WINS`);
-            else if (player2.health <= 0) endGame(`${player1.name.toUpperCase()} WINS`);
+            else if (player2.health <= 0) {
+                if (player2.isTrainingDummy) {
+                    player2.health = MAX_HEALTH;
+                    updateHealthUI(2, player2.health);
+                } else {
+                    endGame(`${player1.name.toUpperCase()} WINS`);
+                }
+            }
         }
 
         function animate(currentTime) {
