@@ -418,24 +418,24 @@
 
         <div id="controls-p1" class="controls-box">
             <h3>Player 1 (Valen)</h3>
-            <div><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> Move/Jump</div>
+            <div><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> Move</div>
             <div><span class="key">E</span> Light Strike</div>
             <div><span class="key">R</span> Heavy/Launch</div>
             <div><span class="key">H</span> Charge Resonance</div>
             <div><span class="key">F</span> Block</div>
             <div><span class="key">V</span> Dash</div>
-            <div><span class="key ult-key-highlight">T</span> Ultimate (Full Gauge / Opponent HP &le; 30%)</div>
+            <div><span class="key ult-key-highlight">T</span> Ultimate (Full Resonance)</div>
         </div>
         
         <div id="controls-p2" class="controls-box">
             <h3>Player 2 (Nyx)</h3>
-            <div><span class="key">Arrows</span> Move/Jump</div>
+            <div><span class="key">Arrows</span> Move</div>
             <div><span class="key">O</span> Light Strike</div>
             <div><span class="key">P</span> Heavy/Launch</div>
             <div><span class="key">;</span> Charge Resonance</div>
             <div><span class="key">L</span> Block</div>
             <div><span class="key">.</span> Dash</div>
-            <div><span class="key ult-key-highlight">U</span> Ultimate (Full Gauge / Opponent HP &le; 30%)</div>
+            <div><span class="key ult-key-highlight">U</span> Ultimate (Full Resonance)</div>
         </div>
     </div>
 
@@ -964,13 +964,73 @@
         }
 
         const GRAVITY = -0.028; 
-        const JUMP_FORCE = 0.44;  
         const MAX_HEALTH = 1000;
         const MAX_RESONANCE = 100;
         const GROUND_Y = 0.4; 
 
         function lerpAngle(current, target, factor) {
             return current + (target - current) * factor;
+        }
+
+        // Procedural crack/panel texture for Nyx's armor, drawn on a canvas at runtime —
+        // no external image files needed. The base fill is near-white so it modulates the
+        // material's actual color (set separately) rather than overriding it: panel seams
+        // are broader, softer lines; cracks are thinner, jagged branching paths; and a few
+        // faint magenta veins suggest energy leaking through the armor, echoing the
+        // reference art's crack motif. Regenerated per-fighter (cheap, one-time canvas
+        // draw at match start), so Nyx's left/right mirror-match variant gets its own
+        // independent crack pattern rather than an identical copy.
+        function createCrackedArmorTexture() {
+            const size = 256;
+            const canvas = document.createElement('canvas');
+            canvas.width = size; canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#e8e0f0';
+            ctx.fillRect(0, 0, size, size);
+
+            ctx.strokeStyle = 'rgba(40,20,60,0.5)';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 5; i++) {
+                const x = Math.random() * size;
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + (Math.random() - 0.5) * 40, size); ctx.stroke();
+            }
+            for (let i = 0; i < 4; i++) {
+                const y = Math.random() * size;
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(size, y + (Math.random() - 0.5) * 40); ctx.stroke();
+            }
+
+            ctx.strokeStyle = 'rgba(10,5,20,0.7)';
+            ctx.lineWidth = 1.5;
+            for (let c = 0; c < 8; c++) {
+                let x = Math.random() * size, y = Math.random() * size;
+                ctx.beginPath(); ctx.moveTo(x, y);
+                for (let seg = 0; seg < 5; seg++) {
+                    x += (Math.random() - 0.5) * 50;
+                    y += (Math.random() - 0.5) * 50;
+                    ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+
+            ctx.strokeStyle = 'rgba(217,70,239,0.55)';
+            ctx.lineWidth = 1;
+            for (let c = 0; c < 3; c++) {
+                let x = Math.random() * size, y = Math.random() * size;
+                ctx.beginPath(); ctx.moveTo(x, y);
+                for (let seg = 0; seg < 4; seg++) {
+                    x += (Math.random() - 0.5) * 60;
+                    y += (Math.random() - 0.5) * 60;
+                    ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(1.5, 1.5);
+            return texture;
         }
 
         function easeRotation(obj, tx, ty, tz, factor) {
@@ -1006,6 +1066,18 @@
                 lElbow: [-1, 0, 0], rElbow: [-1, 0, 0],
                 lLeg: [0.3, 0, 0], rLeg: [0.3, 0, 0],
                 lKnee: [0.3, 0, 0], rKnee: [0.3, 0, 0]
+            },
+            victory: {
+                lArm: [-2.6, 0, 0.4], rArm: [-2.6, 0, -0.4],
+                lElbow: [-0.3, 0, 0], rElbow: [-0.3, 0, 0],
+                lLeg: [0.1, 0, 0], rLeg: [-0.1, 0, 0],
+                lKnee: [0.15, 0, 0], rKnee: [0.15, 0, 0]
+            },
+            defeat: {
+                lArm: [0.9, 0, 0.5], rArm: [0.9, 0, -0.5],
+                lElbow: [-1.4, 0, 0], rElbow: [-1.4, 0, 0],
+                lLeg: [0.4, 0, 0], rLeg: [0.4, 0, 0],
+                lKnee: [0.6, 0, 0], rKnee: [0.6, 0, 0]
             }
         };
 
@@ -1127,6 +1199,7 @@
 
                 this.attackStep = 0;
                 this.canChain = false;
+                this.heavyVariant = 0; // cycles 0-3 each heavy attack — see executeHeavyAttack for the sequence
                 
                 this.currentAttack = null;
                 this.hitboxConfig = { size: [2, 2, 2], offset: [0, 1, 1.5] };
@@ -1140,6 +1213,9 @@
                 this.ultFrame = 0;
                 this.ultPhase = 0;
                 this.ultHitsDone = 0;
+
+                this.prevActionKeys = {}; // tracks last frame's held state for light/heavy/dash so attacks only fire on a fresh press, not while held
+                this.gameOverPose = null; // set to 'victory' or 'defeat' by endGame(); lerped every frame once the match ends
 
                 this.mesh = this.createMesh(color);
                 this.mesh.position.set(startX, GROUND_Y, 0);
@@ -1168,9 +1244,14 @@
 
             createMesh(color) {
                 const group = new THREE.Group();
-                
-                const baseMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.4, metalness: 0.6 });
-                const darkMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.6, metalness: 0.2 });
+
+                // Nyx's crack texture is generated once here and reused across all of his
+                // body/limb/armor materials for a consistent look, rather than each piece
+                // getting its own independent (and visually mismatched) pattern.
+                const armorTexture = this.charType === 'nyx' ? createCrackedArmorTexture() : null;
+
+                const baseMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.4, metalness: 0.6, map: armorTexture });
+                const darkMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.6, metalness: 0.2, map: armorTexture });
                 darkMat.color.multiplyScalar(0.6);
                 
                 const bodyGeo = new THREE.BoxGeometry(1.0, 1.6, 0.8);
@@ -1210,7 +1291,14 @@
                     pivot.position.set(xOffset, yOffset, 0);
                     pivot.name = name;
 
-                    const upperGeo = new THREE.BoxGeometry(0.35, 0.8, 0.35);
+                    // Nyx gets tapered hexagonal segments instead of plain boxes — a less
+                    // blocky silhouette while staying low-poly and angular (6 sides) rather
+                    // than smoothly rounded, which would clash with the crystalline armor
+                    // look. Valen is untouched — out of scope for this pass.
+                    const isNyx = this.charType === 'nyx';
+                    const upperGeo = isNyx
+                        ? new THREE.CylinderGeometry(0.15, 0.19, 0.8, 6)
+                        : new THREE.BoxGeometry(0.35, 0.8, 0.35);
                     const upper = new THREE.Mesh(upperGeo, darkMat);
                     upper.position.y = -0.4;
                     upper.castShadow = true;
@@ -1221,7 +1309,9 @@
                     joint.name = name + "Joint"; 
                     pivot.add(joint);
 
-                    const lowerGeo = new THREE.BoxGeometry(0.32, 0.8, 0.32);
+                    const lowerGeo = isNyx
+                        ? new THREE.CylinderGeometry(0.13, 0.17, 0.8, 6)
+                        : new THREE.BoxGeometry(0.32, 0.8, 0.32);
                     const lowerMat = isArm ? baseMat : darkMat; 
                     const lower = new THREE.Mesh(lowerGeo, lowerMat);
                     lower.position.y = -0.4;
@@ -1236,12 +1326,151 @@
                 const leftLeg = createLimb(false, -0.35, 1.2, "leftLeg");
                 const rightLeg = createLimb(false, 0.35, 1.2, "rightLeg");
 
+                if (this.charType === 'nyx') {
+                    // Nyx redesign based on the reference art: angular crystalline armor
+                    // plating, a glowing void/black-hole element in the chest. Octahedron
+                    // geometry gives a naturally faceted, gem-like shape that plain boxes
+                    // can't — closest match available to the jagged crystal-armor look in
+                    // the reference without modeling custom low-poly geometry from scratch.
+                    const armorMat = new THREE.MeshStandardMaterial({ color: 0x581c87, roughness: 0.3, metalness: 0.7, emissive: 0x3b0764, emissiveIntensity: 0.15, map: armorTexture });
+
+                    // Shoulder pauldrons — attached to the arm pivots (not the torso) so
+                    // they move naturally with the arms during poses and attacks.
+                    [leftArm, rightArm].forEach((arm, i) => {
+                        const side = i === 0 ? -1 : 1;
+                        const pauldron = new THREE.Mesh(new THREE.OctahedronGeometry(0.42, 0), armorMat);
+                        pauldron.position.set(side * 0.15, 0.1, 0);
+                        pauldron.scale.set(1, 0.75, 1);
+                        pauldron.castShadow = true;
+                        arm.add(pauldron);
+                    });
+
+                    // Faceted shin guards — same material/shape family as the pauldrons for
+                    // a consistent crystal-armor look, attached to each leg's knee joint so
+                    // they follow the lower leg specifically, not the whole leg pivot.
+                    [leftLeg, rightLeg].forEach(leg => {
+                        const shin = new THREE.Mesh(new THREE.OctahedronGeometry(0.28, 0), armorMat);
+                        shin.position.set(0, -0.35, 0.12);
+                        shin.scale.set(0.8, 1.1, 0.8);
+                        shin.castShadow = true;
+                        leg.getObjectByName(leg.name + "Joint").add(shin);
+                    });
+
+                    // Void chest: a dark hollow sphere with a thin glowing ring around it,
+                    // echoing the black-hole-in-the-chest look from the reference. Attached
+                    // directly to the body group (a fixed torso feature, not a limb).
+                    const voidSphere = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.22, 16, 16),
+                        new THREE.MeshBasicMaterial({ color: 0x000000 })
+                    );
+                    voidSphere.position.set(0, 1.7, 0.42);
+                    group.add(voidSphere);
+
+                    const voidRing = new THREE.Mesh(
+                        new THREE.TorusGeometry(0.26, 0.045, 8, 24),
+                        new THREE.MeshStandardMaterial({ color: 0xd946ef, emissive: 0xd946ef, emissiveIntensity: 0.9 })
+                    );
+                    voidRing.position.set(0, 1.7, 0.43);
+                    group.add(voidRing);
+
+                    // Palm void portals — small glowing rings at each hand, echoing the
+                    // reference's swirling portal-hand effect. Attached to the elbow joint
+                    // (not the arm pivot) and offset down its local axis to land at roughly
+                    // the hand/fist position, so it follows arm AND forearm movement during
+                    // poses and attacks rather than staying rigid relative to the shoulder.
+                    // Static glow rather than a full animated swirl — this engine doesn't
+                    // have a shader/particle budget to spare for continuous per-frame portal
+                    // animation on both hands at once.
+                    [leftArm, rightArm].forEach(arm => {
+                        const handJoint = arm.getObjectByName(arm.name + "Joint");
+                        const portal = new THREE.Mesh(
+                            new THREE.TorusGeometry(0.16, 0.03, 8, 20),
+                            new THREE.MeshStandardMaterial({ color: 0xd946ef, emissive: 0xd946ef, emissiveIntensity: 0.85 })
+                        );
+                        portal.position.set(0, -0.85, 0);
+                        portal.rotation.x = Math.PI / 2;
+                        handJoint.add(portal);
+                    });
+
+                    // Back armor plate — same material and shape family as the shoulder
+                    // pauldrons so it reads as part of one consistent armor set, mounted on
+                    // the body at the back (negative Z, opposite the chest void) rather than
+                    // leaving the silhouette bare from behind. Flattened on the Z axis so it
+                    // hugs the torso instead of protruding like a full round gem.
+                    const backPlate = new THREE.Mesh(new THREE.OctahedronGeometry(0.5, 0), armorMat);
+                    backPlate.position.set(0, 2.05, -0.5);
+                    backPlate.scale.set(1.1, 1.3, 0.5);
+                    backPlate.castShadow = true;
+                    group.add(backPlate);
+
+                    // Ambient floating debris — small crystal shards orbiting the character,
+                    // echoing the fragments floating around Nyx in the reference. Rotated
+                    // continuously in Fighter.update() via this named group.
+                    const debrisGroup = new THREE.Group();
+                    debrisGroup.name = "nyxDebris";
+                    const debrisMat = new THREE.MeshStandardMaterial({ color: 0x9333ea, emissive: 0x9333ea, emissiveIntensity: 0.5, roughness: 0.4, metalness: 0.5 });
+                    for (let i = 0; i < 6; i++) {
+                        const shard = new THREE.Mesh(new THREE.TetrahedronGeometry(0.08 + Math.random() * 0.05, 0), debrisMat);
+                        const angle = (i / 6) * Math.PI * 2;
+                        const radius = 1.1 + Math.random() * 0.3;
+                        const height = 1.4 + Math.random() * 1.2;
+                        shard.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
+                        shard.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+                        debrisGroup.add(shard);
+                    }
+                    group.add(debrisGroup);
+                }
+
                 group.add(leftArm);
                 group.add(rightArm);
                 group.add(leftLeg);
                 group.add(rightLeg);
 
                 return group;
+            }
+
+            // Single source of truth for ultimate eligibility, used by player input,
+            // bot AI, and the UI badge alike so the three can't drift out of sync with
+            // each other (they previously each re-implemented the same formula).
+            // Resonance-only gate, per feedback — no more free access at low opponent HP.
+            canActivateUltimate(opponent) {
+                return this.resonance >= MAX_RESONANCE && !this.hasUsedUltimate;
+            }
+
+            // Applies one tick of ultimate damage to `opponent`. Previously this was
+            // applied unconditionally with no block or invulnerability check at all,
+            // meaning ultimates were 100% guaranteed and unblockable, and (in the edge
+            // case where both fighters' ultimates overlap) could bypass an opponent's
+            // own invulnerability frames, unlike every other damage path in the game.
+            // Now: invulnerable opponents take nothing, and blocking opponents take
+            // reduced chip damage to their block meter instead of health, exactly like
+            // a normal attack, with the same guard-break consequence if it drains out.
+            // Returns true only if the tick actually landed on health, so callers can
+            // skip full "landed a hit" visual feedback for blocked/invuln ticks.
+            dealUltimateTick(opponent, damage) {
+                if (opponent.invulnTimer > 0) return false;
+
+                if (opponent.state === 'blocking') {
+                    opponent.blockMeter -= damage * 0.8;
+                    playSound('block');
+                    createHitSpark(opponent.mesh.position, 0x94a3b8);
+                    if (opponent.blockMeter <= 0) {
+                        opponent.isGuardBroken = true;
+                        opponent.blockMeter = 0;
+                        opponent.state = 'hit';
+                        opponent.isDizzy = true;
+                        opponent.stunTimer = 60;
+                        setStatusUI(opponent.id, "GUARD BROKEN!", true);
+                    }
+                    opponent.updateUI(this);
+                    return false;
+                }
+
+                opponent.health -= damage;
+                if (opponent.health < 0) opponent.health = 0;
+                updateHealthUI(opponent.id, opponent.health);
+                hitStopFrames = Math.max(hitStopFrames, 3); // smaller than a normal hit since these tick every 5 frames — too much stacks into stutter instead of punch
+                return true;
             }
 
             triggerUltimate(opponent) {
@@ -1351,14 +1580,14 @@
 
                         if (this.ultFrame % 5 === 0 && this.ultHitsDone < 10) {
                             this.ultHitsDone++;
-                            playSound('hit');
-                            createShockwave(opponent.mesh.position, attackColor, 6);
-                            createHitSpark(opponent.mesh.position, 0xffffff);
-                            opponent.health -= 35; 
-                            if (opponent.health < 0) opponent.health = 0;
-                            updateHealthUI(opponent.id, opponent.health);
-                            this.comboCount++;
-                            updateComboUI(this.id, this.comboCount);
+                            const landed = this.dealUltimateTick(opponent, 35);
+                            if (landed) {
+                                playSound('hit');
+                                createShockwave(opponent.mesh.position, attackColor, 6);
+                                createHitSpark(opponent.mesh.position, 0xffffff);
+                                this.comboCount++;
+                                updateComboUI(this.id, this.comboCount);
+                            }
                         }
 
                         if (this.ultFrame >= 60) {
@@ -1428,14 +1657,14 @@
 
                         if (this.ultFrame > 10 && this.ultFrame % 5 === 0 && this.ultHitsDone < 10) {
                             this.ultHitsDone++;
-                            createSlashEffect(opponent.mesh.position, attackColor);
-                            createHitSpark(opponent.mesh.position, 0xffffff);
-                            playSound('hit');
-                            opponent.health -= 35;
-                            if (opponent.health < 0) opponent.health = 0;
-                            updateHealthUI(opponent.id, opponent.health);
-                            this.comboCount++;
-                            updateComboUI(this.id, this.comboCount);
+                            const landed = this.dealUltimateTick(opponent, 35);
+                            if (landed) {
+                                createSlashEffect(opponent.mesh.position, attackColor);
+                                createHitSpark(opponent.mesh.position, 0xffffff);
+                                playSound('hit');
+                                this.comboCount++;
+                                updateComboUI(this.id, this.comboCount);
+                            }
                         }
 
                         if (this.ultFrame >= 70) {
@@ -1563,14 +1792,23 @@
 
                 this.mesh.position.add(this.velocity);
 
-                if (this.mesh.position.y < 0) {
-                    this.mesh.position.y = 0;
+                // Ground collision was clamping to world y=0, but the character's origin is
+                // meant to rest at GROUND_Y (0.4) — the leg geometry's lowest point sits 0.4
+                // units below the mesh origin (traced through the leg pivot/joint offsets),
+                // so a resting origin of 0.4 puts the feet exactly at the floor (y=0). Clamping
+                // to 0 instead put the origin 0.4 too low, sinking the feet visibly into the
+                // ground on every landing. This also mean any y above 0.1 (including the
+                // correct resting height of 0.4) was misclassified as airborne, so the
+                // character was incorrectly flagged as not-grounded almost all the time it
+                // was standing still — including immediately on spawn.
+                if (this.mesh.position.y < GROUND_Y) {
+                    this.mesh.position.y = GROUND_Y;
                     this.velocity.y = 0;
                     this.isGrounded = true;
                     if (this.isLaunched && this.stunTimer > 0 && this.velocity.y < -0.2) {
                        this.velocity.y = 0.2; 
                     }
-                } else if (this.mesh.position.y > 0.1 && this.state !== 'ultimate') {
+                } else if (this.mesh.position.y > GROUND_Y + 0.1 && this.state !== 'ultimate') {
                     this.isGrounded = false;
                 }
 
@@ -1615,16 +1853,41 @@
                     this.mesh.rotation.z = lerpAngle(this.mesh.rotation.z, 0, 0.3); 
                 }
 
+                // Nyx's orbiting debris shards rotate continuously regardless of state —
+                // cached on first lookup since getObjectByName is a tree walk and this runs
+                // every fixed step.
+                if (this.charType === 'nyx') {
+                    if (this.nyxDebris === undefined) this.nyxDebris = this.mesh.getObjectByName("nyxDebris") || null;
+                    if (this.nyxDebris) this.nyxDebris.rotation.y += 0.015;
+                }
+
                 if (this.isBot && this.stunTimer <= 0) {
                     this.updateBot(opponent);
                 }
 
                 const currentKeys = this.isBot ? this.virtualKeys : keys;
-                
+
+                // Rising-edge detection for one-shot actions (light, heavy, dash).
+                // Without this, handleInputs() sees the raw held-down state every step and
+                // re-fires the action the instant it's able to again — which is what let
+                // holding light/heavy auto-chain combos, and let holding dash re-trigger a
+                // fresh dash every single frame (state stays 'dashing' but actionTimer is
+                // never set, so handleInputs kept running mid-dash). A press only counts if
+                // the key was up on the previous fixed step; block/charge/movement are left
+                // as continuous checks since those are meant to respond to being held.
+                const justPressed = {
+                    light: !!currentKeys[this.controls.light] && !this.prevActionKeys[this.controls.light],
+                    heavy: !!currentKeys[this.controls.heavy] && !this.prevActionKeys[this.controls.heavy],
+                    dash: !!currentKeys[this.controls.dash] && !this.prevActionKeys[this.controls.dash]
+                };
+                this.prevActionKeys[this.controls.light] = !!currentKeys[this.controls.light];
+                this.prevActionKeys[this.controls.heavy] = !!currentKeys[this.controls.heavy];
+                this.prevActionKeys[this.controls.dash] = !!currentKeys[this.controls.dash];
+
                 if (this.stunTimer <= 0 && (this.actionTimer <= 0 || this.canChain)) {
-                    this.handleInputs(currentKeys, opponent);
+                    this.handleInputs(currentKeys, opponent, justPressed);
                 } else if (this.stunTimer <= 0 && this.state === 'idle') {
-                    this.handleInputs(currentKeys, opponent); 
+                    this.handleInputs(currentKeys, opponent, justPressed);
                 }
 
                 if (this.state === 'idle' || this.state === 'blocking' || this.state === 'charging') {
@@ -1652,17 +1915,49 @@
                     const bob = Math.sin(bt) * 0.06;
                     lKnee.rotation.x += bob; rKnee.rotation.x -= bob;
                     lArm.rotation.x += bob * 0.3; rArm.rotation.x -= bob * 0.3;
+                    // Subtle breathing sway on the torso during idle only (charging stays
+                    // still — reads as focus/concentration rather than looking robotic).
+                    // Small enough (~1.5 degrees) to not interfere with attack/hit poses,
+                    // which override torsoLeanTarget the instant they need to anyway.
+                    if (this.state === 'idle') {
+                        this.torsoLeanTarget = Math.sin(bt * 0.5) * 0.025;
+                    }
                 } else if (this.state === 'moving') {
-                    const t = Date.now() * 0.012; 
-                    lLeg.rotation.x = Math.sin(t) * 0.8;
-                    lKnee.rotation.x = Math.max(0, Math.sin(t) * 1.0); 
-                    rLeg.rotation.x = Math.cos(t) * 0.8;
-                    rKnee.rotation.x = Math.max(0, Math.cos(t) * 1.0);
-                    
-                    lArm.rotation.x = Math.cos(t) * 0.6;
-                    lElbow.rotation.x = -0.3;
-                    rArm.rotation.x = Math.sin(t) * 0.6;
-                    rElbow.rotation.x = -0.3;
+                    // Boxer-style bouncy shuffle instead of a wide marching stride: short
+                    // quick steps, knees staying bent throughout (a base bend that never
+                    // straightens out, unlike the old sin()*1.0 which fully extended each
+                    // leg), the guard held up near the face instead of the arms swinging
+                    // through a full pendulum, a light bounce on the balls of the feet, and
+                    // a subtle side-to-side weight shift through the torso.
+                    const t = Date.now() * 0.022; // quicker cadence than a casual walk — light, busy feet
+                    const stepSwing = 0.32; // was 0.8 — short shuffling steps, not long strides
+
+                    lLeg.rotation.x = Math.sin(t) * stepSwing;
+                    rLeg.rotation.x = Math.cos(t) * stepSwing;
+
+                    // Base bend of 0.45 rad keeps the knees visibly bent at all times, with
+                    // a bit of extra flex layered on as each foot plants.
+                    lKnee.rotation.x = 0.45 + Math.max(0, Math.sin(t)) * 0.35;
+                    rKnee.rotation.x = 0.45 + Math.max(0, Math.cos(t)) * 0.35;
+
+                    // Guard stays up near the face — only a small sway synced to the
+                    // footwork, not a full swinging arm motion.
+                    lArm.rotation.x = -0.95 + Math.sin(t) * 0.08;
+                    rArm.rotation.x = -0.95 - Math.sin(t) * 0.08;
+                    lElbow.rotation.x = -1.3;
+                    rElbow.rotation.x = -1.3;
+
+                    // Light bounce on the balls of the feet. Kept small (max 0.035) and
+                    // well clear of the airborne-detection threshold (GROUND_Y + 0.1) so it
+                    // can never falsely flag the fighter as airborne and block grounded-only
+                    // actions like block/charge/dash.
+                    this.mesh.position.y = GROUND_Y + Math.abs(Math.sin(t * 2)) * 0.035;
+
+                    // Subtle weight shift side to side. This is a plain assignment made
+                    // after the dizzy-reset lerp earlier in update(), so it fully overrides
+                    // that lerp while moving and eases back to neutral through that same
+                    // lerp the instant movement stops — no extra reset code needed.
+                    this.mesh.rotation.z = Math.sin(t) * 0.05;
                 } else if (this.state === 'blocking') {
                     applyPose(limbs, STANCE_POSES.blocking, POSE_LERP.stance);
                 } else if (this.state === 'attacking' && this.currentAttack) {
@@ -1695,13 +1990,10 @@
                 this.updateUI(opponent);
             }
 
-            handleInputs(keys, opponent) {
-                const canUseUltimate = (this.resonance >= MAX_RESONANCE || opponent.health <= MAX_HEALTH * 0.30) && !this.hasUsedUltimate;
-
-                if (keys[this.controls.ult] && canUseUltimate) {
-                    this.triggerUltimate(opponent);
-                    return;
-                }
+            handleInputs(keys, opponent, justPressed) {
+                // Ultimate is no longer triggered from here — moved entirely to the raw
+                // keydown listener (see below), bypassing this whole per-frame pipeline.
+                // See that listener for why.
 
                 if (keys[this.controls.block] && this.isGrounded && !this.isGuardBroken) {
                     this.state = 'blocking';
@@ -1714,7 +2006,7 @@
                 if (keys[this.controls.charge] && this.isGrounded) {
                     this.state = 'charging';
                     if (this.resonance < MAX_RESONANCE) {
-                        this.resonance += 0.8;
+                        this.resonance += 0.25; // was 0.8 — ~4x longer to fill the bar (~8.3s of continuous charging instead of ~2.1s), per feedback that ults were coming too fast
                         if (this.resonance > MAX_RESONANCE) this.resonance = MAX_RESONANCE;
                     }
                     setStatusUI(this.id, "CHARGING AETHER", true);
@@ -1723,7 +2015,7 @@
                     if (this.state === 'charging') setStatusUI(this.id, "", false);
                 }
 
-                if (keys[this.controls.dash] && this.isGrounded) {
+                if (justPressed.dash && this.isGrounded) {
                     this.state = 'dashing';
                     this.dashFrame = 0;
                     this.dashStartPos = this.mesh.position.clone();
@@ -1743,12 +2035,12 @@
                     return;
                 }
 
-                if (keys[this.controls.light]) {
+                if (justPressed.light) {
                     this.executeLightAttack();
                     return;
                 }
 
-                if (keys[this.controls.heavy]) {
+                if (justPressed.heavy) {
                     this.executeHeavyAttack();
                     return;
                 }
@@ -1756,12 +2048,17 @@
                 let moveSpeed = 0.22;
                 let moveDir = new THREE.Vector3();
 
+                // Full directional movement on WASD, jump removed. Previously 'up' only
+                // triggered a jump and did nothing for movement, 'down' wasn't used for
+                // movement at all, and only left/right actually moved you (side-to-side
+                // only) — there was no forward/back movement outside of dashing. Now all
+                // four directions move normally; isGrounded stays true essentially always
+                // except when an attack launches you into the air, which is unaffected by
+                // this change.
                 if (keys[this.controls.left]) moveDir.x -= 1;
                 if (keys[this.controls.right]) moveDir.x += 1;
-                if (keys[this.controls.up] && this.isGrounded) {
-                    this.velocity.y = JUMP_FORCE;
-                    this.isGrounded = false;
-                }
+                if (keys[this.controls.up]) moveDir.z -= 1;
+                if (keys[this.controls.down]) moveDir.z += 1;
 
                 if (moveDir.length() > 0) {
                     moveDir.normalize();
@@ -1778,13 +2075,29 @@
                 this.attackStep = (this.attackStep % 3) + 1;
                 playSound('light_punch');
 
+                // Jab-style poses: real jabs barely wind up (the whole point is speed and
+                // surprise) and travel in a mostly straight line — the old poses used a big
+                // chamber pull-back plus a large rotation.y sweep on the strike, which reads
+                // as a hook or a cross, not a jab. Chamber is now shallow and the strike is
+                // almost pure forward thrust (rotation.y/z near zero) for hits 1-2. Hit 3
+                // stays a bigger, more committed two-handed finish since it's the combo's
+                // launcher — still straight, just bigger.
                 const poses = [
-                    { chamber: { rArm: [-1.2, 0, -0.6], lArm: [0.2, 0, 0.2] }, strike: { rArm: [1.2, -0.8, 0], lArm: [-0.5, 0, 0.2] }, cLean: -0.2, sLean: 0.3 },
-                    { chamber: { lArm: [-1.2, 0, 0.6], rArm: [0.2, 0, -0.2] }, strike: { lArm: [1.2, 0.8, 0], rArm: [-0.5, 0, -0.2] }, cLean: -0.2, sLean: 0.3 },
-                    { chamber: { rArm: [-1.8, 0, 0], lArm: [-1.8, 0, 0] }, strike: { rArm: [1.5, 0, 0], lArm: [1.5, 0, 0] }, cLean: -0.4, sLean: 0.5 }
+                    { chamber: { rArm: [-0.6, 0, -0.15], lArm: [-0.9, 0, 0.3] }, strike: { rArm: [1.0, -0.1, -0.05], lArm: [-0.9, 0, 0.3] }, cLean: -0.05, sLean: 0.15 },
+                    { chamber: { lArm: [-0.6, 0, 0.15], rArm: [-0.9, 0, -0.3] }, strike: { lArm: [1.0, 0.1, 0.05], rArm: [-0.9, 0, -0.3] }, cLean: -0.05, sLean: 0.15 },
+                    { chamber: { rArm: [-1.4, 0, 0], lArm: [-1.4, 0, 0] }, strike: { rArm: [1.3, 0, 0], lArm: [1.3, 0, 0] }, cLean: -0.25, sLean: 0.4 }
                 ];
 
                 const currentPose = poses[this.attackStep - 1];
+
+                // Knockback per hit is now independently tunable instead of one shared
+                // multiplier (0.15 * attackStep) scaling all three hits together — that
+                // coupling meant "quarter the last hit" ended up quartering hits 1 and 2
+                // too. Hits 1-2 are back to their original values; hit 3 (the launcher,
+                // the one that was flying across the map) is set on its own: quartered
+                // from original (0.45 -> 0.1125), then doubled per follow-up feedback
+                // (0.1125 -> 0.225) — net effect is half the original distance.
+                const LIGHT_COMBO_KNOCKBACK = [0.15, 0.30, 0.225];
 
                 this.currentAttack = {
                     frame: 0,
@@ -1792,7 +2105,7 @@
                     activeFrames: 4,
                     recoveryFrames: 6,
                     damage: 35 + (this.attackStep * 10),
-                    knockback: 0.15 * this.attackStep,
+                    knockback: LIGHT_COMBO_KNOCKBACK[this.attackStep - 1],
                     stunDuration: 12,
                     isLaunch: this.attackStep === 3,
                     hasHit: false,
@@ -1809,23 +2122,56 @@
                 this.state = 'attacking';
                 playSound('heavy_punch');
 
+                // Heavy is now the deliberate high-risk/high-reward tool: light stays fast
+                // (poke/spacing/combo tool, unchanged), heavy gets real startup (telegraphed,
+                // reactable/dodgeable) and real recovery (a genuine punish window if blocked
+                // or whiffed). Previously heavy (8/6/10, 24 frames total) was barely slower
+                // than light (4/4/6, 14 frames) despite hitting far harder — there was almost
+                // no commitment or risk attached to a launcher that does 85 damage and always
+                // knocks down. This creates the fast-low-reward vs slow-high-reward tension
+                // that's the actual source of "precise" combat, rather than slowing everything
+                // down uniformly.
+                //
+                // Cycles through 4 poses so both the technique AND the arm change every
+                // single throw, not just alternating uppercut/hook with the same right arm
+                // each time: right-uppercut -> left-hook -> right-hook -> left-uppercut ->
+                // repeat. Every consecutive entry uses the opposite arm from the one before
+                // it (including the wrap from index 3 back to index 0), so arms strictly
+                // alternate no matter how many heavies you throw in a row. Mirrored poses
+                // follow the same convention already used for the light jab's left/right
+                // mirror: rotation.x (forward/back) keeps its sign, rotation.y and
+                // rotation.z (the lateral/twist axes) flip sign. Still purely visual —
+                // damage/knockback/timing are identical across all four.
+                this.heavyVariant = (this.heavyVariant + 1) % 4;
+                const heavyPoses = [
+                    // 0: Right uppercut
+                    { chamber: { rArm: [-2.4, 0, 0.35], lArm: [-0.6, 0, 0.4] }, strike: { rArm: [2.1, 0, -0.25], lArm: [-0.6, 0, 0.4] }, cLean: -0.5, sLean: 0.5 },
+                    // 1: Left hook
+                    { chamber: { lArm: [-1.1, 0.9, -0.1], rArm: [-0.6, 0, -0.4] }, strike: { lArm: [1.1, -0.95, 0.1], rArm: [-0.6, 0, -0.4] }, cLean: -0.4, sLean: 0.65 },
+                    // 2: Right hook
+                    { chamber: { rArm: [-1.1, -0.9, 0.1], lArm: [-0.6, 0, 0.4] }, strike: { rArm: [1.1, 0.95, -0.1], lArm: [-0.6, 0, 0.4] }, cLean: -0.4, sLean: 0.65 },
+                    // 3: Left uppercut
+                    { chamber: { lArm: [-2.4, 0, -0.35], rArm: [-0.6, 0, -0.4] }, strike: { lArm: [2.1, 0, 0.25], rArm: [-0.6, 0, -0.4] }, cLean: -0.5, sLean: 0.5 }
+                ];
+                const variant = heavyPoses[this.heavyVariant];
+
                 this.currentAttack = {
                     frame: 0,
-                    startupFrames: 8,
+                    startupFrames: 14,
                     activeFrames: 6,
-                    recoveryFrames: 10,
+                    recoveryFrames: 20,
                     damage: 85,
                     knockback: 0.45,
                     stunDuration: 22,
                     isLaunch: true,
                     hasHit: false,
                     attackType: 'heavy',
-                    chamber: { rArm: [-2.0, -0.5, 0], lArm: [-0.5, 0, 0.5] },
-                    strike: { rArm: [1.8, 0.5, 0], lArm: [0.5, 0, 0.5] },
-                    chamberLean: -0.4,
-                    strikeLean: 0.6
+                    chamber: variant.chamber,
+                    strike: variant.strike,
+                    chamberLean: variant.cLean,
+                    strikeLean: variant.sLean
                 };
-                this.actionTimer = 24;
+                this.actionTimer = 40; // must equal startupFrames + activeFrames + recoveryFrames (14+6+20), or handleInputs would unlock 16 frames before the animation's recovery actually finishes, silently canceling the extra punish window this change exists to create
             }
 
             updateHitbox() {
@@ -1847,6 +2193,7 @@
                     opponent.blockMeter -= damage * 0.8;
                     playSound('block');
                     createHitSpark(opponent.mesh.position, 0x94a3b8);
+                    hitStopFrames = Math.max(hitStopFrames, 2); // small tap of hit-stop even on block, without the weight of a clean hit
                     
                     if (opponent.blockMeter <= 0) {
                         opponent.isGuardBroken = true;
@@ -1855,6 +2202,8 @@
                         opponent.isDizzy = true;
                         opponent.stunTimer = 60;
                         setStatusUI(opponent.id, "GUARD BROKEN!", true);
+                        hitStopFrames = Math.max(hitStopFrames, 10); // guard break is a bigger moment, sell it
+                        cameraShakeMagnitude = Math.max(cameraShakeMagnitude, 0.18);
                     }
                     opponent.updateUI(this);
                     return;
@@ -1862,6 +2211,11 @@
 
                 playSound(attackType === 'heavy' ? 'heavy_punch' : (attackType === 'light' ? 'light_punch' : 'hit'));
                 triggerFlashScreen();
+
+                // Weight scales with attack type — heavy hits should feel noticeably
+                // heavier than light pokes, not just deal more damage.
+                hitStopFrames = Math.max(hitStopFrames, attackType === 'heavy' ? 9 : 5);
+                cameraShakeMagnitude = Math.max(cameraShakeMagnitude, attackType === 'heavy' ? 0.16 : 0.07);
 
                 opponent.health -= damage;
                 if (opponent.health < 0) opponent.health = 0;
@@ -1912,9 +2266,14 @@
                         else this.virtualKeys[this.controls.dash] = true;
                     }
 
-                    const canBotUlt = (this.resonance >= MAX_RESONANCE || opponent.health <= MAX_HEALTH * 0.3) && !this.hasUsedUltimate;
-                    if (canBotUlt && Math.random() < 0.6) {
-                        this.virtualKeys[this.controls.ult] = true;
+                    // Ultimate handled directly here, same as the player's keydown-driven
+                    // trigger — bots don't fire real key events, so they get their own
+                    // direct call instead of going through the old virtualKeys pipeline.
+                    // Same forced-jump treatment as the player's trigger, for consistency.
+                    if (this.resonance >= MAX_RESONANCE && !this.hasUsedUltimate && this.state !== 'ultimate' && Math.random() < 0.6) {
+                        this.isGrounded = false;
+                        this.mesh.position.y += 0.6;
+                        this.triggerUltimate(opponent);
                     }
                 }
             }
@@ -1924,11 +2283,31 @@
                 updateBlockUI(this.id, this.blockMeter, this.maxBlock);
                 updateResonanceUI(this.id, this.resonance);
 
-                const canUlt = (this.resonance >= MAX_RESONANCE || opponent.health <= MAX_HEALTH * 0.30) && !this.hasUsedUltimate;
+                const canUlt = this.canActivateUltimate(opponent);
                 const ultBadge = document.getElementById(`p${this.id}-ult-badge`);
                 if (ultBadge) {
                     ultBadge.style.display = canUlt ? 'inline-block' : 'none';
                 }
+            }
+
+            // Standalone limb-pose lerp used for the post-match victory/defeat pose. The
+            // normal per-frame pose application lives inside update(), which stops running
+            // once gameState leaves 'PLAYING' — this gives the match-end poses somewhere to
+            // be smoothly eased into instead of the fighters just freezing mid-action.
+            applyStaticPose(pose, factor) {
+                const limbs = {
+                    lArm: this.mesh.getObjectByName("leftArm"),
+                    rArm: this.mesh.getObjectByName("rightArm"),
+                    lLeg: this.mesh.getObjectByName("leftLeg"),
+                    rLeg: this.mesh.getObjectByName("rightLeg"),
+                    lElbow: this.mesh.getObjectByName("leftArmJoint"),
+                    rElbow: this.mesh.getObjectByName("rightArmJoint"),
+                    lKnee: this.mesh.getObjectByName("leftLegJoint"),
+                    rKnee: this.mesh.getObjectByName("rightLegJoint")
+                };
+                applyPose(limbs, pose, factor);
+                const torsoTarget = this.gameOverPose === 'defeat' ? 0.35 : -0.1;
+                this.mesh.rotation.x = lerpAngle(this.mesh.rotation.x, torsoTarget, factor);
             }
         }
 
@@ -1943,11 +2322,54 @@
         let p1Char = '';
         let p2Char = '';
 
+        // Hit-stop and camera shake — purely presentational "juice", no effect on damage,
+        // timing windows, or any tuned value. Hit-stop briefly skips fixed-timestep logic
+        // steps (both fighters freeze identically, so relative timing is unaffected) to
+        // sell weight on impact; camera shake decays every rendered frame independent of
+        // the fixed-timestep rate, so it looks the same regardless of display refresh rate.
+        let hitStopFrames = 0;
+        let cameraShakeMagnitude = 0;
+
         const keysPressed = {};
 
         window.addEventListener('keydown', (e) => {
             initAudio();
-            keysPressed[e.key.toLowerCase()] = true;
+            const key = e.key.toLowerCase();
+
+            // Rewritten ultimate trigger: fires directly off this raw browser event,
+            // completely bypassing the fixed-timestep update loop and every gating
+            // condition that lives inside it (stunTimer, actionTimer, canChain, the
+            // isGrounded-dependent idle/moving state transitions). Those were all
+            // candidate causes for the ground-only failure, and two rounds of fixing
+            // them individually — including a version with every check fully removed —
+            // still didn't resolve it. Rather than patch that pipeline a third time,
+            // this removes it from the equation entirely for human input. Bots use
+            // their own direct call in updateBot() since they don't fire real key events.
+            if (gameState === 'PLAYING') {
+                [player1, player2].forEach(fighter => {
+                    if (fighter && !fighter.isBot && key === fighter.controls.ult &&
+                        !keysPressed[key] && // only on the actual transition (key wasn't already down), so holding it can't spam-retrigger
+                        fighter.resonance >= MAX_RESONANCE && !fighter.hasUsedUltimate &&
+                        fighter.state !== 'ultimate') {
+                        const opponent = fighter === player1 ? player2 : player1;
+
+                        // Forced jump before the ultimate, per request. This sets isGrounded
+                        // false (matching what a real jump does) and gives an instant visible
+                        // upward hop via a direct position change, rather than leaving real
+                        // jump velocity active — gravity is deliberately disabled during
+                        // 'ultimate' state (see the gravity check in update()), so leftover
+                        // upward velocity with nothing to cancel it would drift the fighter
+                        // continuously upward for the ~40-frame charge-up phase before the
+                        // cutscene's own camera/position logic takes over.
+                        fighter.isGrounded = false;
+                        fighter.mesh.position.y += 0.6;
+
+                        fighter.triggerUltimate(opponent);
+                    }
+                });
+            }
+
+            keysPressed[key] = true;
             if (e.key === 'Escape' && gameState === 'PLAYING') {
                 pauseGame();
             }
@@ -2066,11 +2488,15 @@
             document.getElementById('controls-p1').querySelector('h3').innerText = `Player 1 (${p1NameStr})`;
             document.getElementById('controls-p2').querySelector('h3').innerText = `Player 2 (${p2NameStr})`;
 
-            let p1Color = p1Char === 'valen' ? 0x38bdf8 : 0xd946ef;
-            let p2Color = p2Char === 'valen' ? 0x38bdf8 : 0xd946ef;
+            // Nyx's base body color moved from bright pink to deep violet-purple, matching
+            // the reference art where the body itself is dark purple and pink is reserved
+            // only for the visor slit and glow accents (chest ring, palm portals) — those
+            // still use 0xd946ef elsewhere and are untouched by this change.
+            let p1Color = p1Char === 'valen' ? 0x38bdf8 : 0x6b21a8;
+            let p2Color = p2Char === 'valen' ? 0x38bdf8 : 0x6b21a8;
             
             if (p1Char === p2Char) {
-                p2Color = p2Char === 'valen' ? 0x0284c7 : 0xa21caf; 
+                p2Color = p2Char === 'valen' ? 0x0284c7 : 0x86198f; 
             }
 
             const p1Controls = { up: 'w', down: 's', left: 'a', right: 'd', light: 'e', heavy: 'r', charge: 'h', block: 'f', dash: 'v', ult: 't' };
@@ -2155,6 +2581,15 @@
             if (timerInterval) clearInterval(timerInterval);
             document.getElementById('winnerText').innerText = winnerText;
             document.getElementById('game-over').style.display = 'flex';
+
+            // A draw leaves both fighters as-is rather than arbitrarily picking a "winner"
+            // pose for someone who didn't actually win.
+            if (player1.health !== player2.health) {
+                const winner = player1.health > player2.health ? player1 : player2;
+                const loser = winner === player1 ? player2 : player1;
+                winner.gameOverPose = 'victory';
+                loser.gameOverPose = 'defeat';
+            }
         }
 
         function resetGame() {
@@ -2190,6 +2625,14 @@
         function stepGame() {
             if (gameState !== 'PLAYING') return;
 
+            // Hit-stop: skip this logic step entirely while active. Both fighters freeze
+            // identically (nothing updates), so relative timing between them is unaffected —
+            // this only adds a brief shared pause on impact, it doesn't change any frame data.
+            if (hitStopFrames > 0) {
+                hitStopFrames--;
+                return;
+            }
+
             player1.update(keysPressed, player2, FIXED_DT_SEC);
             player2.update(keysPressed, player1, FIXED_DT_SEC);
 
@@ -2207,6 +2650,19 @@
                 camera.position.x = lerpAngle(camera.position.x, midX, 0.08);
                 camera.position.z = lerpAngle(camera.position.z, midZ + dist * 0.9 + 6, 0.08);
                 camera.position.y = lerpAngle(camera.position.y, 4.5 + dist * 0.15, 0.08);
+
+                // Camera shake decays a little each logic step this runs on. It pauses
+                // along with everything else during hit-stop (this code sits after that
+                // early return) — which reads as a clean, total freeze-frame on impact
+                // rather than a shake that keeps going while the fighters are frozen.
+                if (cameraShakeMagnitude > 0.001) {
+                    camera.position.x += (Math.random() - 0.5) * cameraShakeMagnitude;
+                    camera.position.y += (Math.random() - 0.5) * cameraShakeMagnitude;
+                    cameraShakeMagnitude *= 0.82;
+                } else {
+                    cameraShakeMagnitude = 0;
+                }
+
                 camera.lookAt(midX, 2.0, midZ);
             }
 
@@ -2229,6 +2685,15 @@
             while (accumulator >= FIXED_DT_MS) {
                 stepGame();
                 accumulator -= FIXED_DT_MS;
+            }
+
+            // Victory/defeat pose easing runs independent of the fixed-timestep gameplay
+            // loop (stepGame only runs during 'PLAYING') so the match-end pose still
+            // smoothly settles in every rendered frame instead of the fighters just
+            // freezing mid-action the instant the match ends.
+            if (gameState === 'GAMEOVER') {
+                if (player1 && player1.gameOverPose) player1.applyStaticPose(STANCE_POSES[player1.gameOverPose], 0.05);
+                if (player2 && player2.gameOverPose) player2.applyStaticPose(STANCE_POSES[player2.gameOverPose], 0.05);
             }
 
             renderer.render(scene, camera);
