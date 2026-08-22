@@ -1870,8 +1870,11 @@
             // bot AI, and the UI badge alike so the three can't drift out of sync with
             // each other (they previously each re-implemented the same formula).
             // Resonance-only gate, per feedback — no more free access at low opponent HP.
+            // Training mode bypasses the once-per-match hasUsedUltimate lock entirely,
+            // so the ult stays available every time resonance refills — the whole point
+            // of a practice mode is repeatable reps, not a one-shot per match.
             canActivateUltimate(opponent) {
-                return this.resonance >= MAX_RESONANCE && !this.hasUsedUltimate;
+                return this.resonance >= MAX_RESONANCE && (trainingMode || !this.hasUsedUltimate);
             }
 
             // Applies one tick of ultimate damage to `opponent`. Previously this was
@@ -2834,7 +2837,7 @@
                 [player1, player2].forEach(fighter => {
                     if (fighter && !fighter.isBot && key === fighter.controls.ult &&
                         !keysPressed[key] && // only on the actual transition (key wasn't already down), so holding it can't spam-retrigger
-                        fighter.resonance >= MAX_RESONANCE && !fighter.hasUsedUltimate &&
+                        fighter.canActivateUltimate() &&
                         fighter.state !== 'ultimate') {
                         const opponent = fighter === player1 ? player2 : player1;
 
