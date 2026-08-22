@@ -1598,7 +1598,7 @@
                 // hit sparks, etc. via the `color` param — but the armor shell itself uses
                 // a fixed dark indigo so the model reads as a dark mech with glowing cyan
                 // accents (per the reference art) instead of solid bright blue all over.
-                const bodyColor = this.charType === 'valen' ? 0x21215c : color;
+                const bodyColor = this.charType === 'valen' ? 0x3a5fa8 : color;
                 const baseMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.4, metalness: 0.6, map: armorTexture });
                 const darkMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.6, metalness: 0.2, map: armorTexture });
                 darkMat.color.multiplyScalar(0.6);
@@ -1768,7 +1768,7 @@
                     // bird/bat wing, matching the reference's shattered-glass silhouette.
                     const runeMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x22d3ee, emissiveIntensity: 1.1, roughness: 0.3, metalness: 0.4 });
                     const crystalMat = new THREE.MeshStandardMaterial({ color: 0x7dd3fc, emissive: 0x0ea5e9, emissiveIntensity: 0.7, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.9 });
-                    const gauntletMat = new THREE.MeshStandardMaterial({ color: 0x21215c, roughness: 0.3, metalness: 0.75 });
+                    const gauntletMat = new THREE.MeshStandardMaterial({ color: 0x3a5fa8, roughness: 0.3, metalness: 0.75 });
 
                     // Crystal wing fan: 5 shards per side, fanning upward/outward and
                     // growing longer toward the top, echoing the reference's angel-like
