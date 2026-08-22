@@ -377,9 +377,20 @@
             clip-path: polygon(18% 0, 100% 0, 100% 100%, 0% 100%);
             background-image: url('https://raw.githubusercontent.com/racelijaharcadio/racelijaharcadio.github.io/main/settings.jpg');
         }
+        /* Training's clip-path only cuts its right edge, so its label at the
+           default padding is untouched. Versus and Settings both cut into
+           their own top-left corner instead — exactly where the label sits —
+           which was slicing the first letter off ("/ERSUS", "ETTINGS"). These
+           push the label right by enough margin to clear each panel's own
+           diagonal (computed from each panel's clip inset, plus a safety
+           buffer), without changing the shape of the diagonal itself. */
+        .hub-versus .hub-label {
+            margin-left: 36px;
+        }
         .hub-options .hub-label {
             color: #16a34a;
             text-shadow: 0 0 6px rgba(22, 163, 74, 0.5), 1px 1px 0 rgba(0,0,0,0.15);
+            margin-left: 46px;
         }
 
         /* Controls remapping list inside the Options screen. */
